@@ -31,7 +31,7 @@ str(activityData)
 
 We'll use the *dplyr* package to summarize the data. First we need to group the data by date:
 
-```{r groupedbydate, results="HIDE"}
+```{r groupedbydate}
 library(dplyr)
 by_date <- group_by(activityData, activityData$date)
 ```
