@@ -1,25 +1,189 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Reproducible Research - Week 2 Assignment"
+author: "Benjamin Partridge"
+date: "March 13, 2018"
+output: html_document
 ---
 
+## Loading and processing the data
 
-## Loading and preprocessing the data
+The data are included in a \*.csv file within a \*.zip archive. This zip archive is first unzipped and the resultant csv file loaded:
 
+```{r loaddata, cache=TRUE}
+unzip("activity.zip")
+activityData <- read.csv("activity.csv")
+```
 
+We can look at the structure of the data using the str() function;
 
-## What is mean total number of steps taken per day?
+```{r}
+str(activityData)
+```
 
+We can see that the date column has been loaded as a column of factors. This must be corrected:
 
+```{r makedate, cache=TRUE}
+activityData$date <- as.Date(activityData$date)
+str(activityData)
+```
+
+## What is the mean total number of steps taken in a day?
+
+We'll use the *dplyr* package to summarize the data. First we need to group the data by date:
+
+```{r groupedbydate, results="HIDE"}
+library(dplyr)
+by_date <- group_by(activityData, activityData$date)
+```
+
+Then we can evaluate the sum of the steps taken, per day, ignoring all missing values:
+
+```{r stepsperday}
+stepsperday <- summarize(by_date, sum(steps, na.rm=TRUE))
+print(stepsperday, n = 61)
+```
+
+Next we will produce a histogram.
+
+```{r plotHistogram}
+hist(stepsperday$`sum(steps, na.rm = TRUE)`,
+     xlab = "Steps per day",
+     main = "Total Steps per Day",
+     breaks = 10,
+     col = "blue")
+```
+
+We see that the subject walks between 10,000 and 12,000 steps on the highest number of days. To calculate the mean and median number of steps walked per day, we can call the summary() function:
+
+```{r summarySteps}
+summary(stepsperday$`sum(steps, na.rm = TRUE)`)
+```
+
+From which we see that the mean number of steps per day is 9,354, and the median number of steps per day is 10,395.
 
 ## What is the average daily activity pattern?
 
+We would like to plot the average activity of the subject as a function of time period during the day. First we need to group the data by interval during the day, just as we did previously by date:
 
+```{r groupedbyinterval, results="HIDE"}
+by_interval <- group_by(activityData, activityData$interval)
+```
+
+Then we can evaluate the average number of steps taken, per interval during the day, ignoring all missing values:
+
+```{r stepsperinterval}
+stepsperinterval <- summarize(by_interval, mean(steps, na.rm=TRUE))
+```
+
+Finally we produce a time series plot to visualize the subject's activity during the day:
+
+```{r plotActivity}
+plot(stepsperinterval,
+     type = "l",
+     xlab = "Interval index",
+     ylab = "Mean number of steps",
+     main = "Average daily activity",
+     col = "blue")
+```
+
+We can then look up which interval has the maximum number of steps:
+```{r maxStepsbyInterval}
+max <- max(stepsperinterval$`mean(steps, na.rm = TRUE)`)          ## Determine the max value of steps
+index <- grep(max, stepsperinterval$`mean(steps, na.rm = TRUE)`)  ## Find row number containing max value
+stepsperinterval[index,]                                          ## Read row containing max value
+```
+
+Therefore we see that the most active interval (on average) was interval 835, with an average of 206 steps during that interval.
 
 ## Imputing missing values
 
+To count the number of missing values, we can generate a logical vector of whether each value is NA or not, and then take the sum of that vector (given that TRUE = 1 and FALSE = 0):
 
+```{r countNA}
+sum(is.na(activityData$steps))
+```
+
+There are therefore 2304 missing values in the 'steps' variable.
+
+Let's replace each missing value with the mean number of steps for the corresponding interval, as determined previously.
+
+```{r replaceNA}
+for (i in 1:nrow(activityData)) {
+      if (is.na(activityData[i,1] == TRUE)) {
+                  activityData[i,1] <- stepsperinterval[stepsperinterval$`activityData$interval` == activityData$interval[i],2]
+      }
+}
+```
+
+We can again evaluate the number of missing values:
+
+```{r countNA2}
+sum(is.na(activityData$steps))
+```
+
+As desired, there are no missing values remaining in the dataset. We will again plot a histogram of the number of steps taken each day, first by grouping the data by day, and then by summarizing the number of steps per day. The code used here is the same as previously:
+
+```{r Histogram2}
+by_date <- group_by(activityData, activityData$date)
+stepsperday <- summarize(by_date, sum(steps, na.rm=TRUE))
+hist(stepsperday$`sum(steps, na.rm = TRUE)`,
+     xlab = "Steps per day",
+     main = "Total Steps per Day",
+     breaks = 10,
+     col = "red")
+```
+
+To calculate the mean and median number of steps walked per day, we again call the summary() function:
+
+```{r summarySteps2}
+summary(stepsperday$`sum(steps, na.rm = TRUE)`)
+```
+
+From which we see that the mean number of steps per day is 10,766, and the median number of steps per day is 10,766. (Without missing values, these figures were mean = 9,354 and median = 10,395.) Imputing missing values increases both the mean and the median numbers of steps.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+To look for weekday and weekend trends, we first need to categorize the data as 'weekend' and 'weekday':
+
+```{r replaceNA2}
+weekdays1 <- c("Monday","Tuesday","Wednesday","Thursday","Friday")
+
+for (i in 1:nrow(activityData)) {
+      if (weekdays(activityData$date[i]) %in% weekdays1) { 
+            activityData$day[i] <- "weekday"
+      }
+      else {
+            activityData$day[i] <- "weekend"
+      }
+}
+
+activityData$day <- as.factor(activityData$day)
+
+str(activityData)
+```
+
+We can see from the above str() result that the 'day' variable has coded each observation as weekday or weekend.
+
+Next we want to evaluate the average number of steps taken, per interval during the day:
+
+```{r wkend_wkday}
+by_interval <- group_by(activityData, activityData$interval, activityData$day)
+stepsperinterval <- summarize(by_interval, mean(steps, na.rm=TRUE))
+stepsperinterval
+```
+
+Finally we produce a time series plot to visualize the subject's average activity during weekends and weekdays:
+
+```{r plotActivity2}
+library(lattice)
+factors <- as.factor(c("weekday", "weekend"))
+xyplot(
+      `mean(steps, na.rm = TRUE)` ~ `activityData$interval` | factors,
+      data = stepsperinterval,
+      layout = c(1,2),
+      xlab = "Interval",
+      ylab = "Mean number of steps",
+      type = "l",
+      col = "purple"
+)
+```
